@@ -1,0 +1,63 @@
+[
+  {
+    "id": "site1",
+    "lat": 17.017,
+    "lon": 54.083,
+    "elevation_m": 336.84,
+    "start": "2000-01-01",
+    "end": "2026-10-28",
+    "n_days": 9798,
+    "filled_values": 0,
+    "trimmed_trailing_days": 3,
+    "columns": [
+      "T2M",
+      "T2M_MAX",
+      "T2M_MIN",
+      "RH2M",
+      "WS2M",
+      "PRECTOTCORR"
+    ],
+    "source_file": "site1_17.017N_54.083E.csv"
+  },
+  {
+    "id": "site2",
+    "lat": 23.0715,
+    "lon": 57.6381,
+    "elevation_m": 713.73,
+    "start": "2000-01-01",
+    "end": "2026-10-31",
+    "n_days": 9801,
+    "filled_values": 0,
+    "trimmed_trailing_days": 0,
+    "columns": [
+      "T2M",
+      "T2M_MAX",
+      "T2M_MIN",
+      "RH2M",
+      "WS2M",
+      "PRECTOTCORR"
+    ],
+    "source_file": "site2_23.072N_57.638E.csv"
+  },
+  {
+    "id": "site3",
+    "lat": 23.7067,
+    "lon": 57.9065,
+    "elevation_m": 370.52,
+    "start": "2001-01-01",
+    "end": "2026-10-14",
+    "n_days": 9418,
+    "filled_values": 0,
+    "trimmed_trailing_days": 3,
+    "columns": [
+      "T2M",
+      "T2M_MAX",
+      "T2M_MIN",
+      "RH2M",
+      "WS2M",
+      "PRECTOTCORR",
+      "ALLSKY_SFC_SW_DWN"
+    ],
+    "source_file": "site3_23.707N_57.907E.csv"
+  }
+]
