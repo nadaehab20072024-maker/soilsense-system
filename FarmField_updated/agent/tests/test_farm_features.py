@@ -308,22 +308,24 @@ def test_meter_marker_and_charts(fake_st):
 
 
 @needs_team
-def test_report_page_with_insight_card_and_charts(fake_st):
+def test_report_page_is_automatic_summary_no_form(fake_st):
     st = fake_st
+    st.session_state["ss_agent_profile"] = {"asked": [], "existing_rotation": ["wheat", "tomato"], "crop": "tomato",
+                                            "photo_notes": ["tomato: leaf spot (medium)"]}
     st._dash.render_report_page({"lang": "ar", "lat": 23.7, "lon": 57.9})
-    assert "ss_agent_report" not in st.session_state                     # nothing until the farmer asks
-    st.session_state["ss_agent_ff_name"] = "مزرعة سالم"
-    st.session_state["ss_agent_ff_status"] = "some_problems"
-    st._rec["submit"].add("💾 احفظ المعلومات")
-    st._rec["clicks"].add("ss_agent_make_report")
-    st._rec["charts"].clear()
-    st._dash.render_report_page({"lang": "ar", "lat": 23.7, "lon": 57.9})
+    assert "form_submit_button" not in st._rec["calls"] and "text_area" not in st._rec["calls"]   # nothing to fill
     rep = st.session_state["ss_agent_report"]
     ins = rep["insights"]
-    assert ins["headline"] and ins["why"] and ins["meaning"] and ins["actions"]
+    assert ins["headline"] and ins["summary"] and ins["why"] and ins["meaning"] and ins["actions"]
+    assert "ري طماطم" in ins["summary"] and "آخر صورة" in ins["summary"]          # built from what the chat knows
     assert any("ليش أشوف هذا؟" in x for x in st._rec["texts"]) and any("وش أسوي؟" in x for x in st._rec["texts"])
-    assert len(st._rec["charts"]) == 4                                   # level count, level by day, watering, temperature
-    assert rep["md"].startswith("# تقرير المزرعة: مزرعة سالم") and st._rec["downloads"]
+    assert len(st._rec["charts"]) == 4 and st._rec["downloads"]
+    assert "## ملخص الوضع الحين" in rep["md"] and "حالة المزرعة" not in rep["md"]     # no invented status
+    sig = rep["sig"]
+    st._dash.render_report_page({"lang": "ar", "lat": 23.7, "lon": 57.9})
+    assert st.session_state["ss_agent_report"]["sig"] == sig                         # not rebuilt on every rerun
+    st._dash.render_report_page({"lang": "en", "lat": 23.7, "lon": 57.9})
+    assert st.session_state["ss_agent_report"]["lang"] == "en"                       # rebuilt when language changes
     assert all(k.startswith("ss_agent_") for k in st._rec["keys"])
 
 

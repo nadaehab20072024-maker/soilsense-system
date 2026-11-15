@@ -13,7 +13,7 @@ from . import config as C
 from . import grounding as G
 from . import guards
 from .i18n import crop_name
-from .i18n_farm import tf
+from .i18n_farm import month_names, tf
 from .llm import AllProvidersFailed, chat
 
 # Typical application efficiency by method. NEEDS EXPERT REVIEW (commonly quoted FAO ranges:
@@ -26,8 +26,8 @@ STATUSES = ("good", "some_problems", "serious_problems")
 def new_farm_info(profile: dict | None = None) -> dict:
     p = profile or {}
     return dict(name="", lat=p.get("lat"), lon=p.get("lon"), crops=list(p.get("existing_rotation") or [])[:3],
-                crop_now=p.get("crop") or "", stage="growing", area_m2=None, method="unknown",
-                last_irrigation=None, status="good", notes="", updated=None)
+                crop_now=p.get("crop") or "", stage=None, area_m2=None, method=None,
+                last_irrigation=None, status=None, notes="", updated=None)
 
 
 def build_report_data(info: dict, weather: dict, schedule: dict | None, rotation: dict | None,
@@ -47,6 +47,8 @@ def build_report_data(info: dict, weather: dict, schedule: dict | None, rotation
                      worst_day=dict(date=worst["date"], level=worst["level"], top=worst["top"],
                                     tmax_c=worst["tmax_c"], rain_mm=worst["rain_mm"], gust_kmh=worst["gust_kmh"])
                      if worst else None,
+                     today=next((dict(date=d["date"], level=d["level"], top=d["top"], tmax_c=d["tmax_c"],
+                                      rain_mm=d["rain_mm"]) for d in coming if d["when"] == "today"), None),
                      hottest_c=max([d["tmax_c"] for d in coming if d["tmax_c"] is not None], default=None),
                      rain_total_mm=round(sum(d["rain_mm"] for d in coming), 1),
                      alerts=[dict(date=a["date"], level=a["level"], hazards=[h["key"] for h in a["hazards"]])
@@ -72,6 +74,18 @@ def build_report_data(info: dict, weather: dict, schedule: dict | None, rotation
 
 
 # ------------------------------------------------------------------ insights
+def _d(date: str, lang: str) -> str:
+    """2026-11-19 -> '19 نوفمبر' (same date, farmer-friendly)."""
+    try:
+        d = dt.date.fromisoformat(date)
+        return f"{d.day} {month_names(lang)[d.month - 1]}"
+    except (TypeError, ValueError):
+        return str(date)
+
+
+def _n(x) -> str:
+    return f"{x:g}" if isinstance(x, (int, float)) else str(x)
+
 # Structure (like an "AI insights" card): headline / why (evidence bullets) / meaning / actions.
 def _rule_insights(data: dict, lang: str) -> dict:
     w, wt, farm = data["weather"], data.get("watering"), data["farm"]
@@ -79,19 +93,19 @@ def _rule_insights(data: dict, lang: str) -> dict:
     lvl = worst["level"] if worst else 0
     why, actions = [], []
     if worst and lvl >= 3:
-        headline = tf("ins_danger", lang, date=worst["date"], lvl=tf(f"lvl_{lvl}", lang))
-        why.append(tf("why_worst", lang, date=worst["date"], hz=tf("hz_" + worst["top"], lang)))
+        headline = tf("ins_danger", lang, date=_d(worst["date"], lang), lvl=tf(f"lvl_{lvl}", lang))
+        why.append(tf("why_worst", lang, date=_d(worst["date"], lang), hz=tf("hz_" + worst["top"], lang)))
     elif w.get("available"):
         headline = tf("ins_calm", lang)
     else:
         headline = tf("forecast_unavailable", lang)
     if w.get("available"):
-        why.append(tf("why_rain_heat", lang, mm=w["rain_total_mm"], c=w["hottest_c"]))
+        why.append(tf("why_rain_heat", lang, mm=_n(w["rain_total_mm"]), c=_n(w["hottest_c"])))
     for a in w.get("alerts", [])[:1]:
         from .weather import ADVICE, _family
         actions += [tf(ADVICE.get(_family(h), "adv_general"), lang) for h in a["hazards"][:2]]
     if wt and wt["coming_total_mm"] > 0:
-        why.append(tf("ins_water", lang, mm=wt["coming_total_mm"]) + (
+        why.append(tf("ins_water", lang, mm=_n(wt["coming_total_mm"])) + (
             " " + tf("ins_litres", lang, l=wt["coming_total_litres"]) if wt.get("coming_total_litres") else ""))
     if wt and wt.get("days"):
         actions.append(tf("act_today", lang, act=tf("act_" + wt["days"][0]["action"], lang)))
@@ -104,7 +118,33 @@ def _rule_insights(data: dict, lang: str) -> dict:
         r = data["rotation"]
         why.append(tf("ins_rotation", lang, best=" → ".join(crop_name(c, lang) for c in r["best"]), s=r["best_score"]))
     actions = list(dict.fromkeys(actions))[:4] or [tf("act_none", lang)]
-    return dict(headline=headline, why=why[:5], meaning=tf(f"msg_{lvl}", lang), actions=actions)
+    return dict(headline=headline, summary=_rule_summary(data, lang), why=why[:5], meaning=tf(f"msg_{lvl}", lang),
+                actions=actions)
+
+
+def _rule_summary(data: dict, lang: str) -> str:
+    """A short status paragraph built only from the report data."""
+    w, wt = data["weather"], data.get("watering")
+    if not w.get("available"):
+        return tf("forecast_unavailable", lang)
+    parts = []
+    td = w.get("today")
+    if td:
+        parts.append(tf("sum_today", lang, hz=tf("hz_" + td["top"], lang), lvl=tf(f"lvl_{td['level']}", lang).split(" (")[0],
+                        c=_n(td["tmax_c"])))
+    n = len(w.get("alerts") or [])
+    if n and w.get("worst_day"):
+        parts.append(tf("sum_alerts", lang, n=n, date=_d(w["worst_day"]["date"], lang),
+                        lvl=tf(f"lvl_{w['worst_day']['level']}", lang).split(" (")[0]))
+    else:
+        parts.append(tf("ins_calm", lang))
+    parts.append(tf("sum_rain", lang, mm=_n(w["rain_total_mm"]), days=w["days"]))
+    if wt:
+        crop = crop_name(wt["crop"], lang) if wt.get("crop") else tf("neutral_crop", lang)
+        parts.append(tf("sum_water", lang, crop=crop, mm=_n(wt["coming_total_mm"]), avg=_n(wt["avg_need_after_rain_mm"])))
+    if data.get("photos"):
+        parts.append(tf("sum_photo", lang, p=data["photos"][-1]))
+    return " ".join(parts)
 
 
 INSIGHT_PROMPT = """You write the "AI insights" part of a farm report for a farmer in Oman. Language: {lang}.
@@ -112,6 +152,7 @@ Use ONLY the data below. Every number you write must appear in the data. Plain, 
 No pesticide or chemical doses. Weather data is a model forecast, not an official warning.
 Return ONE JSON object:
 {{"headline": "one sentence: the most important thing now",
+  "summary": "3 to 4 sentences summarising the farm's current situation: today's weather, the coming days, watering",
   "why": ["2 to 5 short evidence bullets from the data"],
   "meaning": "one or two sentences: what this means for the farm",
   "actions": ["1 to 4 short things to do now"]}}
@@ -126,7 +167,8 @@ def _pack(rep: dict, source: str, **extra) -> dict:
 
 
 def _all_text(rep: dict) -> str:
-    return " ".join([rep.get("headline", ""), rep.get("meaning", ""), *rep.get("why", []), *rep.get("actions", [])])
+    return " ".join([rep.get("headline", ""), rep.get("summary", ""), rep.get("meaning", ""), *rep.get("why", []),
+                     *rep.get("actions", [])])
 
 
 def ai_insights(data: dict, lang: str) -> dict:
@@ -154,17 +196,18 @@ def ai_insights(data: dict, lang: str) -> dict:
             if bad:                                  # still wrong: drop bullets / sentences that carry them
                 for k in ("why", "actions"):
                     rep[k] = [x for x in rep[k] if not set(G.extract_numbers(x)) & set(bad)]
-                for k in ("headline", "meaning"):
+                for k in ("headline", "summary", "meaning"):
                     rep[k] = G.strip_numbers(rep[k], bad) if set(G.extract_numbers(rep[k])) & set(bad) else rep[k]
         for k in ("why", "actions"):
             rep[k] = [x for x in rep[k] if x and not guards.answer_has_dose(x)][:5]
-        for k in ("headline", "meaning"):
+        for k in ("headline", "summary", "meaning"):
             if guards.answer_has_dose(rep[k]):
                 rep[k] = ""
         if not rep["why"] or not rep["headline"]:
             return fallback
         rep["actions"] = rep["actions"] or fallback["actions"]
         rep["meaning"] = rep["meaning"] or fallback["meaning"]
+        rep["summary"] = rep["summary"] or fallback["summary"]
         return _pack(rep, "ai", provider=provider, grounding=dict(retried=retried, removed=bad))
     except AllProvidersFailed:
         return fallback
@@ -173,7 +216,7 @@ def ai_insights(data: dict, lang: str) -> dict:
 def _parse(text):
     text = re.sub(r"^```(?:json)?|```$", "", (text or "").strip(), flags=re.M).strip()
     m = re.search(r"\{.*\}", text, re.S)
-    out = dict(headline="", why=[], meaning="", actions=[])
+    out = dict(headline="", summary="", why=[], meaning="", actions=[])
     try:
         d = json.loads(m.group(0) if m else text)
     except (json.JSONDecodeError, AttributeError):
@@ -181,6 +224,7 @@ def _parse(text):
     if isinstance(d, dict):
         out["headline"] = str(d.get("headline") or d.get("priority_action") or "")
         out["meaning"] = str(d.get("meaning") or "")
+        out["summary"] = str(d.get("summary") or "")
         out["why"] = [str(x) for x in (d.get("why") or d.get("insights") or []) if isinstance(x, (str, int, float))]
         out["actions"] = [str(x) for x in (d.get("actions") or []) if isinstance(x, (str, int, float))]
     return out
@@ -190,17 +234,19 @@ def _parse(text):
 def to_markdown(data: dict, ins: dict, lang: str, crop_label=lambda c: c) -> str:
     f, w = data["farm"], data["weather"]
     L = [f"# {tf('rep_title', lang)}: {f.get('name') or tf('rep_my_farm', lang)}", f"_{data['date']}_", ""]
-    L += [f"## {tf('rep_farm', lang)}",
-          f"- {tf('f_crops', lang)}: {', '.join(crop_label(c) for c in f.get('crops') or []) or '—'}",
-          f"- {tf('f_stage', lang)}: {tf('stage_' + (f.get('stage') or 'growing'), lang)}",
-          f"- {tf('f_status', lang)}: {tf('status_' + (f.get('status') or 'good'), lang)}",
-          f"- {tf('f_method', lang)}: {tf('method_' + (f.get('method') or 'unknown'), lang)}"]
+    L += [f"## {tf('rep_summary', lang)}", ins.get("summary", ""), ""]
+    known = []
+    if f.get("crops"):
+        known.append(f"- {tf('f_crops', lang)}: {', '.join(crop_label(c) for c in f['crops'])}")
+    for key, field in (("f_stage", "stage"), ("f_status", "status"), ("f_method", "method")):
+        if f.get(field):
+            known.append(f"- {tf(key, lang)}: {tf(field + '_' + f[field], lang)}")
     if f.get("area_m2"):
-        L.append(f"- {tf('f_area', lang)}: {f['area_m2']:g} m²")
-    if f.get("last_irrigation"):
-        L.append(f"- {tf('f_last_irr', lang)}: {f['last_irrigation']}")
-    if f.get("notes"):
-        L.append(f"- {tf('f_notes', lang)}: {f['notes']}")
+        known.append(f"- {tf('f_area', lang)}: {f['area_m2']:g} m²")
+    if f.get("lat") is not None:
+        known.append(f"- 📍 {f['lat']:.3f}, {f['lon']:.3f}")
+    if known:
+        L += [f"## {tf('rep_farm', lang)}"] + known
     L += ["", f"## {tf('rep_insights', lang)} ({tf('src_' + ins['source'], lang)})", f"**{ins['headline']}**", "",
           f"**{tf('rp_why', lang)}**"] + [f"- {x}" for x in ins["why"]]
     L += ["", f"**{tf('rp_meaning', lang)}** {ins['meaning']}", "", f"**{tf('rp_actions', lang)}**"]

@@ -275,6 +275,21 @@ F = {
     "act_today": {"ar": "الري اليوم: {act}", "en": "Watering today: {act}", "bn": "আজকের সেচ: {act}"},
     "act_none": {"ar": "ما يحتاج تسوي شي خاص. كمّل شغلك المعتاد.", "en": "No special action needed. Keep your usual routine.",
                  "bn": "বিশেষ কিছু করার দরকার নেই। স্বাভাবিক কাজ চালিয়ে যান।"},
+    "rep_summary": {"ar": "ملخص الوضع الحين", "en": "Current situation", "bn": "বর্তমান অবস্থা"},
+    "sum_today": {"ar": "اليوم الجو {hz} ومستواه «{lvl}»، والحرارة توصل {c}°م.", "en": "Today: {hz}, level “{lvl}”, up to {c}°C.",
+                  "bn": "আজ: {hz}, মাত্রা “{lvl}”, তাপমাত্রা {c}°সে পর্যন্ত।"},
+    "sum_alerts": {"ar": "عدد التنبيهات في الأيام الجاية: {n}، أخطرها يوم {date} ({lvl}).", "en": "There are {n} alerts in the coming days; the worst is {date} ({lvl}).",
+                   "bn": "আসন্ন দিনে {n}টি সতর্কতা; সবচেয়ে খারাপ {date} ({lvl})।"},
+    "sum_rain": {"ar": "المطر المتوقع خلال {days} أيام: {mm} ملم.", "en": "Expected rain over {days} days: {mm} mm.",
+                 "bn": "{days} দিনে প্রত্যাশিত বৃষ্টি: {mm} মিমি।"},
+    "sum_water": {"ar": "ري {crop} المطلوب في الأيام الجاية حوالي {mm} ملم (معدل {avg} ملم في اليوم).",
+                  "en": "Watering for {crop} in the coming days: about {mm} mm (average {avg} mm per day).",
+                  "bn": "আসন্ন দিনে {crop}-এর সেচ: প্রায় {mm} মিমি (দৈনিক গড় {avg} মিমি)।"},
+    "sum_photo": {"ar": "آخر صورة أرسلتها: {p} (تلميح أولي).", "en": "Your last photo: {p} (early hint).", "bn": "আপনার শেষ ছবি: {p} (প্রাথমিক ইঙ্গিত)।"},
+    "refresh": {"ar": "🔄 حدّث التقرير", "en": "🔄 Refresh the report", "bn": "🔄 রিপোর্ট হালনাগাদ"},
+    "rp_auto_note": {"ar": "التقرير ينحسب تلقائياً من الطقس وجدول الري وكلامك مع المساعد. اذكر محاصيلك في المساعد عشان يصير أدق.",
+                     "en": "This report is built automatically from the weather, the watering plan and your chat with the assistant. Tell the assistant your crops for a sharper report.",
+                     "bn": "রিপোর্টটি আবহাওয়া, সেচ পরিকল্পনা ও সহকারীর সাথে আপনার কথা থেকে নিজে তৈরি হয়। আরও নির্ভুল করতে সহকারীকে আপনার ফসল বলুন।"},
 }
 
 

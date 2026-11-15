@@ -435,7 +435,7 @@ def render_home_overview(context=None):
     from . import charts as CH
     context = dict(context or {})
     prof = _profile(context)
-    farm = _farm(prof)
+    farm = FR.new_farm_info(prof)
     with _root("home_root"):
         lang = _lang_picker(context, "home_lang_choice")
         _rtl("home_root", lang)
@@ -550,39 +550,50 @@ def _insight_card(ins: dict, level: int, lang: str):
     c = W.LEVELS[level]["colour"]
     st.markdown(f"<div style='border-inline-start:8px solid {c};background:{c}1A;border-radius:12px;padding:14px 18px;"
                 f"font-size:1.35rem;font-weight:700'>{_esc(ins['headline'])}</div>", unsafe_allow_html=True)
+    if ins.get("summary"):
+        st.markdown(f"<div style='border:1px solid #7E8CE066;border-radius:12px;padding:12px 16px;margin-top:10px;"
+                    f"line-height:1.9'><b>{_esc(tf('rep_summary', lang))}</b><br>{_esc(ins['summary'])}</div>",
+                    unsafe_allow_html=True)
     st.caption(tf("src_" + ins["source"], lang))
     st.markdown(f"**{tf('rp_why', lang)}**\n" + "\n".join(f"- {x}" for x in ins["why"]))
     st.markdown(f"**{tf('rp_meaning', lang)}**\n\n{ins['meaning']}")
     st.markdown(f"**{tf('rp_actions', lang)}**\n" + "\n".join(f"- {x}" for x in ins["actions"]))
 
 
+def _build_report(context, prof, farm, lang):
+    lat, lon = _location(context, prof, farm)
+    info = dict(farm, lat=lat, lon=lon)
+    ov = _overview(lat, lon, C.WEATHER_DEMO)
+    sch = _schedule_for(ov, farm, prof) if ov.get("available") else None
+    rot = RT.recommend(info["crops"], _profile=prof, _ctx={"lat": lat, "lon": lon}) if info.get("crops") else None
+    data = FR.build_report_data(info, ov, sch, rot, prof.get("photo_notes"))
+    ins = FR.ai_insights(data, lang)
+    md = FR.to_markdown(data, ins, lang, crop_label=lambda c: crop_name(c, lang))
+    return dict(md=md, data=data, insights=ins, days=ov.get("days", []), schedule=sch, lang=lang)
+
+
 def render_report_page(context=None):
-    """Separate page: update farm info -> AI report with explanatory charts -> full report + download."""
+    """Separate page. The report is made AUTOMATICALLY from what is already known (location, weather, watering
+    plan, crops and photos from the chat) - no form. Re-made when the day, place, crops or language change."""
     from . import charts as CH
     context = dict(context or {})
     prof = _profile(context)
-    farm = _farm(prof)
+    farm = FR.new_farm_info(prof)                      # built from the chat profile + host context, never asked
     with _root("rp_root"):
         lang = _lang_picker(context, "rp_lang_choice")
         _rtl("rp_root", lang)
         st.markdown(f"## {_esc(tf('report_page_title', lang))}")
-        with st.expander(tf("update_info", lang), expanded=not farm.get("updated")):
-            _farm_form(lang, prof, farm)
-        if st.button(tf("make_report", lang), key=K + "make_report", type="primary"):
-            lat, lon = _location(context, prof, farm)
-            with st.spinner(t("thinking", lang)):
-                ov = _overview(lat, lon, C.WEATHER_DEMO)
-                sch = _schedule_for(ov, farm, prof) if ov.get("available") else None
-                rot = RT.recommend(farm["crops"], _profile=prof, _ctx={"lat": lat, "lon": lon}) if farm.get("crops") else None
-                data = FR.build_report_data(farm, ov, sch, rot, prof.get("photo_notes"))
-                ins = FR.ai_insights(data, lang)
-                md = FR.to_markdown(data, ins, lang, crop_label=lambda c: crop_name(c, lang))
-            st.session_state[K + "report"] = dict(md=md, data=data, insights=ins, days=ov.get("days", []),
-                                                  schedule=sch, lang=lang)
+        lat, lon = _location(context, prof, farm)
+        sig = (dt.date.today().isoformat(), round(lat, 3), round(lon, 3), lang, tuple(farm.get("crops") or []),
+                          farm.get("crop_now"), len(prof.get("photo_notes") or []))
+        refresh = st.button(tf("refresh", lang), key=K + "rp_refresh")
         rep = st.session_state.get(K + "report")
-        if not rep:
-            st.info(tf("rp_hint", lang))
-            return None
+        if refresh or not rep or rep.get("sig") != sig:
+            with st.spinner(t("thinking", lang)):
+                rep = _build_report(context, prof, farm, lang)
+            rep["sig"] = sig
+            st.session_state[K + "report"] = rep
+        st.caption(f"{rep['data']['date']} · 📍 {lat:.3f}, {lon:.3f} · {tf('rp_auto_note', lang)}")
         worst = (rep["data"]["weather"].get("worst_day") or {}).get("level", 0)
         _insight_card(rep["insights"], worst, lang)
 
