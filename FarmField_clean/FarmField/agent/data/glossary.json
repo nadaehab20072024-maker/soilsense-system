@@ -1,0 +1,14 @@
+[
+  {"local": "نخل / نخيل", "standard": "date palm"},
+  {"local": "فلج", "standard": "falaj (traditional irrigation channel)"},
+  {"local": "حبحب", "standard": "watermelon"},
+  {"local": "ليمون", "standard": "lime"},
+  {"local": "موز", "standard": "banana"},
+  {"local": "ريّ / سقي", "standard": "irrigation"},
+  {"local": "سماد", "standard": "fertilizer"},
+  {"local": "تربة", "standard": "soil"},
+  {"local": "شتلة", "standard": "seedling"},
+  {"local": "وادي", "standard": "wadi (seasonal river bed)"},
+  {"local": "مزرعة", "standard": "farm"},
+  {"local": "حصاد / جني", "standard": "harvest"}
+]
