@@ -1,0 +1,5 @@
+# Extra packages for soilsense_agent/ only. The team app already needs streamlit, pandas and numpy.
+requests>=2.28
+python-dotenv>=1.0    # optional: only for a local .env file
+# for running the tests (not needed on Streamlit Cloud):
+# pytest>=7
